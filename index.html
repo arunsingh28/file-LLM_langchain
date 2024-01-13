@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>File LLM</title>
   </head>
-  <body>
+  <body style="font-family: Arial, Helvetica, sans-serif;">
     <h1 style="text-align: center;">File LLM</h1>
     <div>
       <input type="file" name="file" id="file" />
@@ -36,7 +36,7 @@
         const formData = new FormData();
         formData.append("file", file.files[0]);
 
-        fetch("http://65.1.100.249:3000/upload", {
+        fetch("http://localhost:3000/upload", {
           method: "POST",
           body: formData,
         })
@@ -57,7 +57,7 @@
         const query = document.querySelector('input[type="text"]').value;
         const file = localStorage.getItem("file");
 
-        fetch(`http://65.1.100.249:3000/chat`, {
+        fetch(`http://localhost:3000/chat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

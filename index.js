@@ -17,9 +17,11 @@ import { fileURLToPath } from "url";
 import path, { dirname } from "path";
 import multer from "multer";
 
+const key = process.env.OPEN_AI_API_KEY;
+
 async function main(inputPrompt, fileName) {
   const chatModel = new ChatOpenAI({
-    openAIApiKey: "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",
+    openAIApiKey: key,
   });
 
   const filePath = path.join(
@@ -43,7 +45,7 @@ async function main(inputPrompt, fileName) {
   //   const splitDocs = await splitter.splitDocuments(docs);
 
   const embeddings = new OpenAIEmbeddings({
-    openAIApiKey: "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",
+    openAIApiKey: key,
   });
 
   //   const vectorstore = await MemoryVectorStore.fromDocuments(
@@ -80,12 +82,11 @@ async function main(inputPrompt, fileName) {
     input: inputPrompt,
     context: [
       new Document({
-        pageContent: docs[0].pageContent,
+        pageContent: docs[0]?.pageContent,
       }),
     ],
   });
 
-  Print(response);
   return response;
 
   //   const response = await chain.invoke({
@@ -123,11 +124,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.json({
-        status: false,
         message: "No file uploaded",
       });
     }
-    console.log(req.file);
+    if (req.file.mimetype !== "application/pdf") {
+      return res.json({
+        message: "currently only pdf files are supported",
+      });
+    }
     return res.json({
       status: true,
       message: "File is uploaded",
