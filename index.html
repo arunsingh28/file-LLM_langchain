@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File LLM</title>
+  </head>
+  <body>
+    <h1 style="text-align: center;">File LLM</h1>
+    <div>
+      <input type="file" name="file" id="file" />
+      <input type="submit" value="Upload" id="submit" />
+    </div>
+
+    <div id="chats" style="margin-top: 10px"></div>
+
+    <div style="position: fixed; bottom: 10px; left: 10px; width: 100%">
+      <input
+        type="text"
+        placeholder="Enter your query"
+        style="width: 90%; height: 30px"
+      />
+      <input
+        type="submit"
+        id="chatBtn"
+        value="Search"
+        style="width: 7%; height: 35px"
+      />
+    </div>
+
+    <script>
+      const file = document.getElementById("file");
+      const submit = document.getElementById("submit");
+
+      submit.addEventListener("click", () => {
+        const formData = new FormData();
+        formData.append("file", file.files[0]);
+
+        fetch("http://localhost:3000/upload", {
+          method: "POST",
+          body: formData,
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            alert(result.message);
+            localStorage.setItem("file", result.data.name);
+            console.log("Success:", result);
+          })
+          .catch((error) => {
+            alert("Error: " + error.message);
+            console.error("Error:", error);
+          });
+      });
+
+      const chatBtn = document.getElementById("chatBtn");
+      chatBtn.addEventListener("click", () => {
+        const query = document.querySelector('input[type="text"]').value;
+        const file = localStorage.getItem("file");
+
+        fetch(`http://localhost:3000/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            input: query,
+            fileName: file,
+          }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            appendChat(result);
+          })
+          .catch((error) => {
+            alert("Error: " + error.message);
+            console.error("Error:", error);
+          });
+      });
+
+      const chats = document.getElementById("chats");
+
+      // append chat
+      const appendChat = (chat) => {
+        const div = document.createElement("div");
+        div.innerHTML = chat;
+        div.style.marginBottom = "10px";
+        chats.appendChild(div);
+      };
+    </script>
+  </body>
+</html>
