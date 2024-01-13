@@ -36,7 +36,7 @@
         const formData = new FormData();
         formData.append("file", file.files[0]);
 
-        fetch("http://localhost:3000/upload", {
+        fetch("http://65.1.100.249:3000/upload", {
           method: "POST",
           body: formData,
         })
@@ -57,7 +57,7 @@
         const query = document.querySelector('input[type="text"]').value;
         const file = localStorage.getItem("file");
 
-        fetch(`http://localhost:3000/chat`, {
+        fetch(`http://65.1.100.249:3000/chat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
