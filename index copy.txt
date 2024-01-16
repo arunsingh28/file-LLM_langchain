@@ -3,11 +3,7 @@ Print("File-LLM");
 import dotenv from "dotenv";
 dotenv.config();
 import { ChatOpenAI } from "@langchain/openai";
-import {
-  ChatPromptTemplate,
-  HumanMessagePromptTemplate,
-  SystemMessagePromptTemplate,
-} from "@langchain/core/prompts";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
 import { Document } from "@langchain/core/documents";
@@ -15,19 +11,12 @@ import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { CheerioWebBaseLoader } from "langchain/document_loaders/web/cheerio";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { formatDocumentsAsString } from "langchain/util/document";
 // import langchain from "langchain";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 import express from "express";
 import { fileURLToPath } from "url";
 import path, { dirname } from "path";
 import multer from "multer";
-import { createRetrievalChain } from "langchain/chains/retrieval";
-import { HNSWLib } from "@langchain/community/vectorstores/hnswlib";
-import {
-  RunnablePassthrough,
-  RunnableSequence,
-} from "@langchain/core/runnables";
 
 const key = process.env.OPEN_AI_API_KEY;
 
@@ -42,71 +31,49 @@ async function main(inputPrompt, fileName) {
     fileName
   );
 
-  const loader = new PDFLoader(filePath, { splitPages: false });
+  const loader = new PDFLoader(filePath, { splitPages: true });
   const docs = await loader.load();
 
-  const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
-  const splitDocs = await splitter.createDocuments(
-    docs.map((d) => d.pageContent)
-  );
+  const splitter = new RecursiveCharacterTextSplitter();
+  const splitDocs = await splitter.splitDocuments(docs);
 
-  // console.log("splitDocs:", splitDocs);
+  Print(splitDocs);
 
-  const embeddings = new OpenAIEmbeddings({
-    openAIApiKey: key,
-    maxRetries: 6,
-    maxConcurrency: 1,
-    timeout: 10000,
-  });
+  // const embeddings = new OpenAIEmbeddings({
+  //   openAIApiKey: key,
+  // });
 
-  // console.log("embeddings:", embeddings);
+  // const vectorstore = await MemoryVectorStore.fromDocuments(
+  //   splitDocs,
+  //   embeddings
+  // );
 
-  const vectorstore = await HNSWLib.fromDocuments(splitDocs, embeddings);
+  // const langchainInstance = new langchain();
+  // langchainInstance.addVectorStore(vectorstore);
 
-  const vectorStoreRetriever = vectorstore.asRetriever();
-
-  const SYSTEM_TEMPLATE =
-    SystemMessagePromptTemplate.fromTemplate(`Answer the following question based only on the provided context:
+  const prompt =
+    ChatPromptTemplate.fromTemplate(`Answer the following question based only on the provided context:
+        <context>
         {context}
+        </context>
+    Question: {input}
 `);
 
-  const HUMAN_TEMPLATE = HumanMessagePromptTemplate.fromTemplate(`{question}`);
+  const documentChain = await createStuffDocumentsChain({
+    llm: chatModel,
+    prompt: prompt,
+  });
 
-  const prompt = ChatPromptTemplate.fromMessages([
-    SYSTEM_TEMPLATE,
-    HUMAN_TEMPLATE,
-  ]);
+  const response = await documentChain.invoke({
+    input: inputPrompt,
+    context: [
+      new Document({
+        pageContent: docs[0]?.pageContent,
+      }),
+    ],
+  });
 
-  const chain = RunnableSequence.from([
-    {
-      context: vectorStoreRetriever.pipe(formatDocumentsAsString),
-      question: new RunnablePassthrough(),
-    },
-    prompt,
-    chatModel,
-    new StringOutputParser(),
-  ]);
-
-  // const documentChain = await createStuffDocumentsChain({
-  //   llm: chatModel,
-  //   prompt: prompt,
-  //   outputParser: new StringOutputParser(),
-  // });
-
-  // const retrievalChain = await createRetrievalChain({
-  //   combineDocsChain: documentChain,
-  //   retriever,
-  // });
-
-  // const response = await retrievalChain.invoke({
-  //   input: inputPrompt,
-  // });
-
-  const response = await chain.invoke("what is CEO name of this company ?");
-
-  console.log("response:", response);
-
-  // return response;
+  return response;
 }
 
 function Print(arg) {
@@ -165,7 +132,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 app.post("/chat", async (req, res) => {
   const { input, fileName } = req.body;
   if (!input || !fileName) {
-    main("what is document about ?", "policy.pdf");
     return res.json("File is not uploaded!!!");
   }
   const response = await main(input, fileName);
