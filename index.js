@@ -1,5 +1,3 @@
-Print("File-LLM");
-
 import dotenv from "dotenv";
 dotenv.config();
 import { ChatOpenAI } from "@langchain/openai";
@@ -42,15 +40,16 @@ async function main(inputPrompt, fileName) {
     fileName
   );
 
-  const loader = new PDFLoader(filePath, { splitPages: false });
+  const loader = new PDFLoader(filePath, {
+    splitPages: true,
+    parsedItemSeparator: "\n",
+  });
   const docs = await loader.load();
 
   const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
   const splitDocs = await splitter.createDocuments(
     docs.map((d) => d.pageContent)
   );
-
-  // console.log("splitDocs:", splitDocs);
 
   const embeddings = new OpenAIEmbeddings({
     openAIApiKey: key,
@@ -59,17 +58,13 @@ async function main(inputPrompt, fileName) {
     timeout: 10000,
   });
 
-  // console.log("embeddings:", embeddings);
-
   const vectorstore = await HNSWLib.fromDocuments(splitDocs, embeddings);
 
   const vectorStoreRetriever = vectorstore.asRetriever();
 
-  const SYSTEM_TEMPLATE =
-    SystemMessagePromptTemplate.fromTemplate(`Answer the following question based only on the provided context:
-        {context}
-`);
-
+  const SYSTEM_TEMPLATE = SystemMessagePromptTemplate.fromTemplate(
+    `Answer the following question based only on the provided document: {context} and the filename is ${fileName}`
+  );
   const HUMAN_TEMPLATE = HumanMessagePromptTemplate.fromTemplate(`{question}`);
 
   const prompt = ChatPromptTemplate.fromMessages([
@@ -85,32 +80,28 @@ async function main(inputPrompt, fileName) {
     prompt,
     chatModel,
     new StringOutputParser(),
+    // { stream: true },
   ]);
 
-  // const documentChain = await createStuffDocumentsChain({
-  //   llm: chatModel,
-  //   prompt: prompt,
-  //   outputParser: new StringOutputParser(),
-  // });
-
-  // const retrievalChain = await createRetrievalChain({
-  //   combineDocsChain: documentChain,
-  //   retriever,
-  // });
-
-  // const response = await retrievalChain.invoke({
-  //   input: inputPrompt,
-  // });
-
-  const response = await chain.invoke("what is CEO name of this company ?");
-
-  console.log("response:", response);
-
-  // return response;
-}
-
-function Print(arg) {
-  console.log({ arg });
+  const response = chain.invoke(inputPrompt, {
+    runName: "chat",
+    configurable: true,
+    metadata: {
+      name: "chat",
+      description: "chat",
+      input: {
+        type: "text",
+        description: "chat",
+      },
+      output: {
+        type: "text",
+        description: "chat",
+      },
+    },
+    recursionLimit: 10,
+    tags: ["chat"],
+  });
+  return response;
 }
 
 const app = express();
@@ -165,7 +156,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 app.post("/chat", async (req, res) => {
   const { input, fileName } = req.body;
   if (!input || !fileName) {
-    main("what is document about ?", "policy.pdf");
     return res.json("File is not uploaded!!!");
   }
   const response = await main(input, fileName);
